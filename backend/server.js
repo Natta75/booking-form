@@ -24,6 +24,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "https://www.google.com", "https://www.gstatic.com"],
       frameSrc: ["https://www.google.com"],
+      connectSrc: ["'self'", "https://www.google.com", "https://www.gstatic.com"],
+      imgSrc: ["'self'", "https://www.gstatic.com", "data:"],
     }
   }
 }));
@@ -92,6 +94,12 @@ async function verifyRecaptcha(token) {
     return true; // В dev режиме пропускаем
   }
 
+  // Логировать токен для отладки
+  logger.info('Verifying reCAPTCHA token', {
+    tokenPresent: !!token,
+    tokenLength: token ? token.length : 0
+  });
+
   try {
     const response = await axios.post(
       'https://www.google.com/recaptcha/api/siteverify',
@@ -104,17 +112,21 @@ async function verifyRecaptcha(token) {
       }
     );
 
-    const { success, score } = response.data;
+    const { success, score, 'error-codes': errorCodes } = response.data;
 
-    logger.info('reCAPTCHA verification', {
+    logger.info('reCAPTCHA verification result', {
       success,
-      score: score || 'N/A'
+      score: score || 'N/A',
+      errorCodes: errorCodes || []
     });
 
     // Для reCAPTCHA v3 проверяем score (минимум 0.5)
     return success && (score === undefined || score >= 0.5);
   } catch (error) {
-    logger.error('reCAPTCHA verification failed', { error: error.message });
+    logger.error('reCAPTCHA verification failed', {
+      error: error.message,
+      responseData: error.response?.data
+    });
     return false;
   }
 }

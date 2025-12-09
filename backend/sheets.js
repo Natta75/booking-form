@@ -58,13 +58,14 @@ class GoogleSheetsManager {
         month: '2-digit',
         day: '2-digit'
       }),
-      bookingData.ipAddress || 'N/A'
+      bookingData.time || '',  // Time (пока пустое, поле не добавлено в форму)
+      bookingData.message || ''  // Message (пока пустое, поле не добавлено в форму)
     ]];
 
     try {
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: 'Sheet1!A:F',
+        range: 'Лист1!A:G',  // 7 колонок: Timestamp, Name, Phone, Email, Date, Time, Message
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: { values },

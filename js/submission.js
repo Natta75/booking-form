@@ -10,13 +10,31 @@ async function loadConfig() {
         const config = await response.json();
         recaptchaSiteKey = config.recaptchaSiteKey;
 
-        // Инициализировать reCAPTCHA если ключ загружен
-        if (recaptchaSiteKey && typeof grecaptcha !== 'undefined') {
-            initRecaptcha();
+        // Динамически загрузить скрипт reCAPTCHA v3
+        if (recaptchaSiteKey) {
+            loadRecaptchaScript();
+        } else {
+            console.warn('reCAPTCHA site key not configured');
         }
     } catch (error) {
         console.warn('Failed to load config:', error);
     }
+}
+
+// Динамическая загрузка скрипта reCAPTCHA
+function loadRecaptchaScript() {
+    const script = document.createElement('script');
+    script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        console.log('reCAPTCHA script loaded');
+        initRecaptcha();
+    };
+    script.onerror = () => {
+        console.error('Failed to load reCAPTCHA script');
+    };
+    document.head.appendChild(script);
 }
 
 // Инициализация reCAPTCHA
@@ -196,10 +214,3 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Загрузить конфигурацию и инициализировать reCAPTCHA
     await loadConfig();
 });
-
-// Callback для reCAPTCHA когда скрипт загружен
-window.onRecaptchaLoad = function() {
-    if (recaptchaSiteKey) {
-        initRecaptcha();
-    }
-};
