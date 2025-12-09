@@ -1,5 +1,50 @@
-// Обработка отправки формы
+// Обработка отправки формы с интеграцией backend
 
+let recaptchaSiteKey = null;
+let recaptchaWidgetId = null;
+
+// Загрузка конфигурации с сервера
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        recaptchaSiteKey = config.recaptchaSiteKey;
+
+        // Инициализировать reCAPTCHA если ключ загружен
+        if (recaptchaSiteKey && typeof grecaptcha !== 'undefined') {
+            initRecaptcha();
+        }
+    } catch (error) {
+        console.warn('Failed to load config:', error);
+    }
+}
+
+// Инициализация reCAPTCHA
+function initRecaptcha() {
+    if (!recaptchaSiteKey) return;
+
+    grecaptcha.ready(function() {
+        console.log('reCAPTCHA готова');
+    });
+}
+
+// Получение reCAPTCHA токена
+async function getRecaptchaToken() {
+    if (!recaptchaSiteKey) {
+        console.warn('reCAPTCHA не настроена');
+        return null;
+    }
+
+    try {
+        const token = await grecaptcha.execute(recaptchaSiteKey, { action: 'submit' });
+        return token;
+    } catch (error) {
+        console.error('Ошибка reCAPTCHA:', error);
+        return null;
+    }
+}
+
+// Обработка отправки формы
 async function handleSubmit(event) {
     event.preventDefault();
 
@@ -9,33 +54,73 @@ async function handleSubmit(event) {
         return;
     }
 
-    // Собрать данные формы
-    const formData = {
-        name: document.getElementById('name').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        date: document.getElementById('date').value,
-        timestamp: new Date().toISOString()
-    };
+    // Проверка чекбокса согласия
+    const consentCheckbox = document.getElementById('consent');
+    if (!consentCheckbox.checked) {
+        showErrorMessage('consent', 'Необходимо согласие на обработку персональных данных');
+        return;
+    }
 
     // Показать loading состояние на кнопке
     setButtonLoadingState(true);
 
-    // Логировать данные в консоль
-    console.log('=== Новая заявка на бронирование ===');
-    console.log('Имя:', formData.name);
-    console.log('Телефон:', formData.phone);
-    console.log('Email:', formData.email);
-    console.log('Дата:', new Date(formData.date).toLocaleDateString('ru-RU'));
-    console.log('Отправлено:', new Date(formData.timestamp).toLocaleString('ru-RU'));
-    console.log('====================================');
+    try {
+        // Получить reCAPTCHA токен
+        const recaptchaToken = await getRecaptchaToken();
 
-    // Имитировать задержку сети (1 секунда)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+        // Собрать данные формы
+        const formData = {
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            date: document.getElementById('date').value,
+            consent: consentCheckbox.checked,
+            recaptchaToken: recaptchaToken,
+            timestamp: new Date().toISOString()
+        };
 
-    // Убрать loading состояние
-    setButtonLoadingState(false);
+        // Логировать данные в консоль (для отладки)
+        console.log('=== Отправка заявки на бронирование ===');
+        console.log('Имя:', formData.name);
+        console.log('Телефон:', formData.phone);
+        console.log('Email:', formData.email);
+        console.log('Дата:', new Date(formData.date).toLocaleDateString('ru-RU'));
+        console.log('========================================');
 
+        // Отправить данные на сервер
+        const response = await fetch('/api/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        // Убрать loading состояние
+        setButtonLoadingState(false);
+
+        if (response.ok && result.success) {
+            // Успешная отправка
+            console.log('✅ Заявка успешно отправлена!');
+            showSuccessMessage(formData.name);
+        } else {
+            // Ошибка от сервера
+            console.error('❌ Ошибка сервера:', result.error || result.errors);
+            showServerError(result.error || result.errors);
+        }
+
+    } catch (error) {
+        // Сетевая ошибка
+        console.error('❌ Сетевая ошибка:', error);
+        setButtonLoadingState(false);
+        showNetworkError();
+    }
+}
+
+// Показать сообщение об успехе
+function showSuccessMessage(name) {
     // Скрыть форму с fade-out анимацией
     const form = document.getElementById('bookingForm');
     form.classList.add('fade-out');
@@ -45,11 +130,27 @@ async function handleSubmit(event) {
 
         // Показать благодарственное сообщение с fade-in
         const thankYouMessage = document.getElementById('thankYouMessage');
-        const userName = formData.name.split(' ')[0]; // Первое слово из имени
+        const userName = name.split(' ')[0]; // Первое слово из имени
         thankYouMessage.querySelector('.user-name').textContent = userName;
         thankYouMessage.classList.remove('hidden');
         thankYouMessage.classList.add('fade-in');
     }, 500);
+}
+
+// Показать ошибку от сервера
+function showServerError(errorData) {
+    if (Array.isArray(errorData)) {
+        // Массив ошибок валидации
+        alert('Ошибка валидации:\n\n' + errorData.join('\n'));
+    } else {
+        // Одиночная ошибка
+        alert('Ошибка: ' + errorData);
+    }
+}
+
+// Показать сетевую ошибку
+function showNetworkError() {
+    alert('Ошибка сети. Проверьте подключение к интернету и попробуйте снова.');
 }
 
 // Оставить еще одну заявку
@@ -72,7 +173,7 @@ function submitAnother() {
         form.classList.add('fade-in');
 
         // Очистить все состояния валидации
-        const fields = ['name', 'phone', 'email', 'date'];
+        const fields = ['name', 'phone', 'email', 'date', 'consent'];
         fields.forEach(fieldId => {
             removeAllStates(fieldId);
             hideErrorMessage(fieldId);
@@ -86,9 +187,19 @@ function submitAnother() {
 }
 
 // Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const form = document.getElementById('bookingForm');
 
     // Переопределить обработчик submit
     form.addEventListener('submit', handleSubmit);
+
+    // Загрузить конфигурацию и инициализировать reCAPTCHA
+    await loadConfig();
 });
+
+// Callback для reCAPTCHA когда скрипт загружен
+window.onRecaptchaLoad = function() {
+    if (recaptchaSiteKey) {
+        initRecaptcha();
+    }
+};
