@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Форма бронирования</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Форма бронирования</h1>
+
+        <form id="bookingForm" method="POST" action="/api/submit">
+            <div class="form-group">
+                <label for="name">Имя</label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    required
+                    minlength="2"
+                    maxlength="100"
+                    placeholder="Иван Иванов"
+                    autocomplete="name">
+                <div id="name-error" class="error-message"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Телефон</label>
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    required
+                    pattern="^(\+7|8)[0-9]{10}$"
+                    placeholder="+79001234567"
+                    autocomplete="tel">
+                <div id="phone-error" class="error-message"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    required
+                    placeholder="example@mail.ru"
+                    autocomplete="email">
+                <div id="email-error" class="error-message"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Дата</label>
+                <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    required
+                    min="2025-12-09">
+                <div id="date-error" class="error-message"></div>
+            </div>
+
+            <button type="submit" class="submit-btn">Отправить</button>
+        </form>
+
+        <div id="thankYouMessage" class="thank-you-message hidden">
+            <div class="success-icon-large">✓</div>
+            <h2>Спасибо, <span class="user-name"></span>!</h2>
+            <p>Мы получили вашу заявку и свяжемся с вами в ближайшее время.</p>
+            <button type="button" class="btn-secondary" onclick="submitAnother()">Оставить еще одну заявку</button>
+        </div>
+    </div>
+    <script src="js/animations.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/submission.js"></script>
+</body>
+</html>
