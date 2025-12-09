@@ -9,6 +9,7 @@
  */
 
 const TelegramBot = require('node-telegram-bot-api');
+require('dotenv').config();
 
 // Замените на ваш токен бота
 const token = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
