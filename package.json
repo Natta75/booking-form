@@ -5,7 +5,11 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js"
+    "dev": "nodemon backend/server.js",
+    "test:integrations": "node backend/check-integrations.js",
+    "test:recaptcha": "node backend/test-recaptcha.js",
+    "test:telegram": "node backend/test-submit.js",
+    "get:chatid": "node backend/getChatId.js"
   },
   "keywords": ["booking", "form", "telegram", "google-sheets"],
   "author": "",
