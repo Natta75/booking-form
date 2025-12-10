@@ -4,26 +4,26 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const axios = require('axios');
 
 const config = require('./config');
 const logger = require('./logger');
 const TelegramNotifier = require('./telegram');
 const GoogleSheetsManager = require('./sheets');
 const BookingValidator = require('./validation');
+const RecaptchaEnterpriseManager = require('./recaptcha-enterprise');
 
 const app = express();
 
 // ============ MIDDLEWARE ============
 
-// Security headers
+// Security headers (обновлено для reCAPTCHA Enterprise)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "https://www.google.com", "https://www.gstatic.com"],
-      frameSrc: ["https://www.google.com"],
+      frameSrc: ["https://www.google.com", "https://recaptcha.net"],
       connectSrc: ["'self'", "https://www.google.com", "https://www.gstatic.com"],
       imgSrc: ["'self'", "https://www.gstatic.com", "data:"],
     }
@@ -83,53 +83,10 @@ const telegram = new TelegramNotifier(
 
 const sheets = new GoogleSheetsManager(config.googleSheetId);
 
+const recaptcha = new RecaptchaEnterpriseManager();
+
 // ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
-
-/**
- * Проверка reCAPTCHA токена
- */
-async function verifyRecaptcha(token) {
-  if (!config.recaptcha.secretKey) {
-    logger.warn('reCAPTCHA secret key not configured, skipping verification');
-    return true; // В dev режиме пропускаем
-  }
-
-  // Логировать токен для отладки
-  logger.info('Verifying reCAPTCHA token', {
-    tokenPresent: !!token,
-    tokenLength: token ? token.length : 0
-  });
-
-  try {
-    const response = await axios.post(
-      'https://www.google.com/recaptcha/api/siteverify',
-      null,
-      {
-        params: {
-          secret: config.recaptcha.secretKey,
-          response: token
-        }
-      }
-    );
-
-    const { success, score, 'error-codes': errorCodes } = response.data;
-
-    logger.info('reCAPTCHA verification result', {
-      success,
-      score: score || 'N/A',
-      errorCodes: errorCodes || []
-    });
-
-    // Для reCAPTCHA v3 проверяем score (минимум 0.5)
-    return success && (score === undefined || score >= 0.5);
-  } catch (error) {
-    logger.error('reCAPTCHA verification failed', {
-      error: error.message,
-      responseData: error.response?.data
-    });
-    return false;
-  }
-}
+// (Функция verifyRecaptcha больше не нужна - используется RecaptchaEnterpriseManager)
 
 // ============ API ENDPOINTS ============
 
@@ -151,15 +108,29 @@ app.post('/api/submit', limiter, async (req, res) => {
   try {
     logger.info('Processing booking request', { ip: req.ip });
 
-    // 1. Проверка reCAPTCHA
-    const isHuman = await verifyRecaptcha(req.body.recaptchaToken);
-    if (!isHuman) {
-      logger.warn('reCAPTCHA verification failed', { ip: req.ip });
+    // 1. Проверка reCAPTCHA Enterprise
+    const recaptchaResult = await recaptcha.createAssessment(
+      req.body.recaptchaToken,
+      'submit',
+      req.ip
+    );
+
+    if (!recaptchaResult.success) {
+      logger.warn('reCAPTCHA Enterprise verification failed', {
+        ip: req.ip,
+        score: recaptchaResult.score,
+        reason: recaptchaResult.reason
+      });
       return res.status(400).json({
         success: false,
         error: 'Проверка reCAPTCHA не пройдена. Попробуйте еще раз.'
       });
     }
+
+    logger.info('reCAPTCHA verification passed', {
+      score: recaptchaResult.score,
+      ip: req.ip
+    });
 
     // 2. Валидация данных
     const validationErrors = BookingValidator.validateBookingData(req.body);
@@ -285,10 +256,10 @@ app.listen(PORT, () => {
     logger.warn('⚠️  Google Sheets integration: disabled');
   }
 
-  if (config.recaptcha.secretKey) {
-    logger.info('✅ reCAPTCHA protection: enabled');
+  if (recaptcha.enabled) {
+    logger.info('✅ reCAPTCHA Enterprise protection: enabled');
   } else {
-    logger.warn('⚠️  reCAPTCHA protection: disabled');
+    logger.warn('⚠️  reCAPTCHA Enterprise protection: disabled');
   }
 });
 

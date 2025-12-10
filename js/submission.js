@@ -21,43 +21,45 @@ async function loadConfig() {
     }
 }
 
-// Динамическая загрузка скрипта reCAPTCHA
+// Динамическая загрузка скрипта reCAPTCHA Enterprise
 function loadRecaptchaScript() {
     const script = document.createElement('script');
-    script.src = `https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`;
+    // ИЗМЕНЕНО: используем Enterprise API endpoint
+    script.src = `https://www.google.com/recaptcha/enterprise.js?render=${recaptchaSiteKey}`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
-        console.log('reCAPTCHA script loaded');
+        console.log('reCAPTCHA Enterprise script loaded');
         initRecaptcha();
     };
     script.onerror = () => {
-        console.error('Failed to load reCAPTCHA script');
+        console.error('Failed to load reCAPTCHA Enterprise script');
     };
     document.head.appendChild(script);
 }
 
-// Инициализация reCAPTCHA
+// Инициализация reCAPTCHA Enterprise
 function initRecaptcha() {
     if (!recaptchaSiteKey) return;
 
-    grecaptcha.ready(function() {
-        console.log('reCAPTCHA готова');
+    grecaptcha.enterprise.ready(function() {
+        console.log('reCAPTCHA Enterprise готова');
     });
 }
 
-// Получение reCAPTCHA токена
+// Получение reCAPTCHA Enterprise токена
 async function getRecaptchaToken() {
     if (!recaptchaSiteKey) {
-        console.warn('reCAPTCHA не настроена');
+        console.warn('reCAPTCHA Enterprise не настроена');
         return null;
     }
 
     try {
-        const token = await grecaptcha.execute(recaptchaSiteKey, { action: 'submit' });
+        // ИЗМЕНЕНО: используем grecaptcha.enterprise.execute
+        const token = await grecaptcha.enterprise.execute(recaptchaSiteKey, { action: 'submit' });
         return token;
     } catch (error) {
-        console.error('Ошибка reCAPTCHA:', error);
+        console.error('Ошибка reCAPTCHA Enterprise:', error);
         return null;
     }
 }
